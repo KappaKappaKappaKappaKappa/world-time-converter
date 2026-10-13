@@ -2,33 +2,43 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-tz_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tz_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-timezone_db}
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tz_user} -d ${POSTGRES_DB:-timezone_db}"]
       interval: 3s
       timeout: 3s
       retries: 15
+
+  web-service:
+    build: ./web-service
+    environment:
+      PORT: 4000
+    ports:
+      - "${WEB_SERVICE_PORT:-4000}:4000"
 
   backend:
     build: ./backend
     environment:
       PGHOST: db
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER:-tz_user}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-tz_pass}
+      PGDATABASE: ${POSTGRES_DB:-timezone_db}
+      WEB_SERVICE_URL: http://web-service:4000
       PORT: 3000
     ports:
-      - "${BACKEND_PORT}:3000"
+      - "${BACKEND_PORT:-3000}:3000"
     depends_on:
       db:
         condition: service_healthy
+      web-service:
+        condition: service_started
 
   frontend:
     build: ./frontend
@@ -37,7 +47,7 @@ services:
       HOST: 0.0.0.0
       PORT: 4321
     ports:
-      - "${FRONTEND_PORT}:4321"
+      - "${FRONTEND_PORT:-4321}:4321"
     depends_on:
       - backend
 
